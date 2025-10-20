@@ -1,134 +1,337 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard คุมไฟ - ปุ่มเดียว</title>
-  <style>
-    body { font-family: Tahoma, Arial, sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f5f7fa; }
-    .card { background:white; padding:24px; border-radius:12px; box-shadow:0 8px 24px rgba(30,30,50,0.06); width:320px; text-align:center; }
-    h1 { font-size:18px; margin:0 0 12px; }
-    #status { margin:12px 0; font-weight:700; }
-    #toggleBtn {
-      font-size:16px; padding:12px 18px; border-radius:10px; border:0; cursor:pointer;
-      box-shadow:0 6px 18px rgba(0,0,0,0.08); transition:transform .08s ease;
-    }
-    #toggleBtn:active { transform:translateY(1px); }
-    .on { background:#22c55e; color:white; }
-    .off { background:#ef4444; color:white; }
-    .muted { background:#d1d5db; color:#374151; }
-    .small { font-size:13px; color:#6b7280; margin-top:8px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบควบคุมไฟ IoT - แบบปลอดภัย</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.2rem;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        
+        .status-container {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-label {
+            font-size: 1.2rem;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 15px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            transition: all 0.5s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .status-off {
+            background: linear-gradient(135deg, #8e9eab, #eef2f3);
+            color: #666 !important;
+        }
+        
+        .status-on {
+            background: linear-gradient(135deg, #f46b45, #eea849);
+        }
+        
+        .control-btn {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            margin: 10px 0;
+            width: 100%;
+            max-width: 250px;
+        }
+        
+        .control-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .control-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .control-btn:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+        
+        .connection-status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .login-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .login-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 10px 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Dashboard คุมไฟ (ปุ่มเดียว)</h1>
-    <div id="status">กำลังเชื่อมต่อ...</div>
-    <button id="toggleBtn" class="muted" disabled>Loading...</button>
-    <div class="small">เซ็นอินแบบ Anonymous เพื่อปฏิบัติตาม security rule</div>
-  </div>
+    <div class="container">
+        <h1>ระบบควบคุมไฟ IoT</h1>
+        <p class="subtitle">ควบคุมไฟด้วยการคลิกปุ่มด้านล่าง</p>
+        
+        <div class="warning">
+            <strong>คำเตือนด้านความปลอดภัย:</strong> โปรดตั้งค่า Firebase Rules ให้เหมาะสมเพื่อป้องกันการเข้าถึงข้อมูลโดยไม่ได้รับอนุญาต
+        </div>
+        
+        <div id="loginSection" class="login-section">
+            <p>สถานะการยืนยันตัวตน:</p>
+            <div id="authStatus" class="connection-status disconnected">
+                ไม่ได้ล็อกอิน
+            </div>
+            <button id="anonymousLogin" class="login-btn">ล็อกอินแบบไม่ระบุตัวตน</button>
+        </div>
+        
+        <div class="status-container">
+            <div class="status-label">สถานะไฟปัจจุบัน:</div>
+            <div id="statusIndicator" class="status-indicator status-off">ปิด</div>
+        </div>
+        
+        <button id="controlButton" class="control-btn" disabled>เปิดไฟ</button>
+        
+        <div id="connectionStatus" class="connection-status disconnected">
+            <span class="loading"></span>กำลังเชื่อมต่อกับเซิร์ฟเวอร์...
+        </div>
+        
+        <div class="footer">
+            ระบบควบคุมไฟ IoT Dashboard | พัฒนาด้วย Firebase Firestore
+        </div>
+    </div>
 
-  <!-- Firebase (compat) CDN libs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+             apiKey: "AIzaSyAl1UzIg5jOwK0xi5QdGLgWzM2VhXBXqpk",
+  	     authDomain: "basiciotg3-5eca8.firebaseapp.com",
+  	     projectId: "basiciotg3-5eca8",
+ 	     storageBucket: "basiciotg3-5eca8.firebasestorage.app",
+ 	     messagingSenderId: "592252294623",
+ 	    appId: "1:592252294623:web:a0c49e25bcc48b0676606a",
+ 	    measurementId: "G-Q0Q7SGK3KL"
+        };
 
-  <script>
-    // ----- ใส่ config ที่ผู้ใช้ให้มา (คุณสามารถเปลี่ยนได้) -----
-    const firebaseConfig = {
-      apiKey: "AIzaSyAl1UzIg5jOwK0xi5QdGLgWzM2VhXBXqpk",
-      authDomain: "basiciotg3-5eca8.firebaseapp.com",
-      projectId: "basiciotg3-5eca8",
-      storageBucket: "basiciotg3-5eca8.firebasestorage.app",
-      messagingSenderId: "592252294623",
-      appId: "1:592252294623:web:cbfd71c990841c5076606a",
-      measurementId: "G-LCMBEG10DL"
-    };
-
-    // init firebase
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.database();
-
-    const statusEl = document.getElementById('status');
-    const btn = document.getElementById('toggleBtn');
-    const dbPath = '/status/light'; // path ที่ใช้เก็บสถานะ (boolean)
-
-    // ฟังก์ชันช่วยอัพเดต UI
-    function updateUI(isOn) {
-      if (isOn === null) {
-        statusEl.textContent = 'สถานะ: ไม่ทราบ';
-        btn.textContent = 'ไม่พร้อมใช้งาน';
-        btn.disabled = true;
-        btn.className = 'muted';
-      } else if (isOn) {
-        statusEl.textContent = 'สถานะ: เปิด (ON)';
-        btn.textContent = 'ปิดไฟ';
-        btn.disabled = false;
-        btn.className = 'on';
-      } else {
-        statusEl.textContent = 'สถานะ: ปิด (OFF)';
-        btn.textContent = 'เปิดไฟ';
-        btn.disabled = false;
-        btn.className = 'off';
-      }
-    }
-
-    // เชื่อมต่อแบบ Anonymous (จำเป็นเมื่อใช้ rule ที่ require auth)
-    auth.signInAnonymously()
-      .then(() => {
-        console.log('Signed in anonymously');
-        statusEl.textContent = 'เซ็นอินสำเร็จ กำลังอ่านสถานะ...';
-        listenStatus();
-      })
-      .catch(err => {
-        console.error('Sign-in error:', err);
-        statusEl.textContent = 'ไม่สามารถเซ็นอิน: ' + err.message;
-        updateUI(null);
-      });
-
-    // ฟังค่าจาก Realtime Database แบบเรียลไทม์
-    function listenStatus(){
-      const ref = db.ref(dbPath);
-      ref.on('value', snapshot => {
-        const value = snapshot.val();
-        // คาดว่าเป็น boolean true/false; ถ้า null ให้ถือว่า default false
-        if (value === null) {
-          updateUI(false);
-          // เขียนค่าเริ่มต้นเป็น false (optional)
-          ref.set(false).catch(e => console.error('set default error', e));
-        } else {
-          // ถ้า value เป็น object/อื่นๆ ให้แปลงเป็น boolean
-          const isOn = !!value;
-          updateUI(isOn);
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        
+        // DOM elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const controlButton = document.getElementById('controlButton');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const authStatus = document.getElementById('authStatus');
+        const anonymousLoginBtn = document.getElementById('anonymousLogin');
+        const loginSection = document.getElementById('loginSection');
+        
+        // Reference to the light document
+        const lightDoc = db.collection('devices').doc('light');
+        
+        // Authentication state listener
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // User is signed in
+                authStatus.className = 'connection-status connected';
+                authStatus.innerHTML = '✓ ล็อกอินแล้ว (ไม่ระบุตัวตน)';
+                anonymousLoginBtn.style.display = 'none';
+                setupDatabaseListener();
+            } else {
+                // User is signed out
+                authStatus.className = 'connection-status disconnected';
+                authStatus.innerHTML = 'ไม่ได้ล็อกอิน';
+                anonymousLoginBtn.style.display = 'inline-block';
+                controlButton.disabled = true;
+            }
+        });
+        
+        // Anonymous login
+        anonymousLoginBtn.addEventListener('click', () => {
+            auth.signInAnonymously()
+                .then(() => {
+                    console.log('Signed in anonymously');
+                })
+                .catch((error) => {
+                    console.error('Anonymous sign-in error:', error);
+                    alert('การล็อกอินล้มเหลว: ' + error.message);
+                });
+        });
+        
+        // Setup database listener after authentication
+        function setupDatabaseListener() {
+            // Listen for changes in the light status
+            lightDoc.onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    updateUI(data.status);
+                    connectionStatus.className = 'connection-status connected';
+                    connectionStatus.innerHTML = '✓ เชื่อมต่อกับเซิร์ฟเวอร์แล้ว';
+                    controlButton.disabled = false;
+                } else {
+                    // Create document if it doesn't exist
+                    lightDoc.set({ status: 0, lastUpdated: new Date() });
+                }
+            }, (error) => {
+                console.error('Error reading from database:', error);
+                connectionStatus.className = 'connection-status disconnected';
+                connectionStatus.innerHTML = '✗ การเชื่อมต่อมีปัญหา';
+                controlButton.disabled = true;
+            });
         }
-      }, error => {
-        console.error('listen error', error);
-        statusEl.textContent = 'ฟังสถานะผิดพลาด: ' + error.message;
-        updateUI(null);
-      });
-    }
-
-    // เมื่อกดปุ่ม ให้ toggle ค่า
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      btn.textContent = 'กำลังทำ...';
-      try {
-        const ref = db.ref(dbPath);
-        // อ่านค่าปัจจุบันครั้งเดียว
-        const snap = await ref.get();
-        const current = snap.exists() ? !!snap.val() : false;
-        const newVal = !current;
-        await ref.set(newVal);
-        // UI จะอัพเดตจาก listener อัตโนมัติ
-      } catch (err) {
-        console.error('toggle error', err);
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      } finally {
-        // ปล่อยปุ่มไว้ — listener จะอัพเดตสถานะจริง
-        btn.disabled = false;
-      }
-    });
-  </script>
+        
+        // Update the UI based on light status
+        function updateUI(status) {
+            if (status === 1) {
+                statusIndicator.textContent = 'เปิด';
+                statusIndicator.className = 'status-indicator status-on';
+                controlButton.textContent = 'ปิดไฟ';
+            } else {
+                statusIndicator.textContent = 'ปิด';
+                statusIndicator.className = 'status-indicator status-off';
+                controlButton.textContent = 'เปิดไฟ';
+            }
+        }
+        
+        // Toggle light status when button is clicked
+        controlButton.addEventListener('click', () => {
+            if (!auth.currentUser) {
+                alert('กรุณาล็อกอินก่อน');
+                return;
+            }
+            
+            lightDoc.get().then((doc) => {
+                if (doc.exists) {
+                    const currentStatus = doc.data().status;
+                    const newStatus = currentStatus === 1 ? 0 : 1;
+                    return lightDoc.update({ 
+                        status: newStatus,
+                        lastUpdated: new Date(),
+                        lastUpdatedBy: auth.currentUser.uid
+                    });
+                }
+            }).then(() => {
+                console.log('Light status updated successfully');
+            }).catch((error) => {
+                console.error('Error updating light status:', error);
+                alert('เกิดข้อผิดพลาดในการอัพเดทสถานะไฟ: ' + error.message);
+            });
+        });
+    </script>
 </body>
 </html>
