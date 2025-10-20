@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard คุมไฟ - ปุ่มเดียว</title>
+  <style>
+    body { font-family: Tahoma, Arial, sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f5f7fa; }
+    .card { background:white; padding:24px; border-radius:12px; box-shadow:0 8px 24px rgba(30,30,50,0.06); width:320px; text-align:center; }
+    h1 { font-size:18px; margin:0 0 12px; }
+    #status { margin:12px 0; font-weight:700; }
+    #toggleBtn {
+      font-size:16px; padding:12px 18px; border-radius:10px; border:0; cursor:pointer;
+      box-shadow:0 6px 18px rgba(0,0,0,0.08); transition:transform .08s ease;
+    }
+    #toggleBtn:active { transform:translateY(1px); }
+    .on { background:#22c55e; color:white; }
+    .off { background:#ef4444; color:white; }
+    .muted { background:#d1d5db; color:#374151; }
+    .small { font-size:13px; color:#6b7280; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Dashboard คุมไฟ (ปุ่มเดียว)</h1>
+    <div id="status">กำลังเชื่อมต่อ...</div>
+    <button id="toggleBtn" class="muted" disabled>Loading...</button>
+    <div class="small">เซ็นอินแบบ Anonymous เพื่อปฏิบัติตาม security rule</div>
+  </div>
+
+  <!-- Firebase (compat) CDN libs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <script>
+    // ----- ใส่ config ที่ผู้ใช้ให้มา (คุณสามารถเปลี่ยนได้) -----
+    const firebaseConfig = {
+      apiKey: "AIzaSyAl1UzIg5jOwK0xi5QdGLgWzM2VhXBXqpk",
+      authDomain: "basiciotg3-5eca8.firebaseapp.com",
+      projectId: "basiciotg3-5eca8",
+      storageBucket: "basiciotg3-5eca8.firebasestorage.app",
+      messagingSenderId: "592252294623",
+      appId: "1:592252294623:web:cbfd71c990841c5076606a",
+      measurementId: "G-LCMBEG10DL"
+    };
+
+    // init firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    const statusEl = document.getElementById('status');
+    const btn = document.getElementById('toggleBtn');
+    const dbPath = '/status/light'; // path ที่ใช้เก็บสถานะ (boolean)
+
+    // ฟังก์ชันช่วยอัพเดต UI
+    function updateUI(isOn) {
+      if (isOn === null) {
+        statusEl.textContent = 'สถานะ: ไม่ทราบ';
+        btn.textContent = 'ไม่พร้อมใช้งาน';
+        btn.disabled = true;
+        btn.className = 'muted';
+      } else if (isOn) {
+        statusEl.textContent = 'สถานะ: เปิด (ON)';
+        btn.textContent = 'ปิดไฟ';
+        btn.disabled = false;
+        btn.className = 'on';
+      } else {
+        statusEl.textContent = 'สถานะ: ปิด (OFF)';
+        btn.textContent = 'เปิดไฟ';
+        btn.disabled = false;
+        btn.className = 'off';
+      }
+    }
+
+    // เชื่อมต่อแบบ Anonymous (จำเป็นเมื่อใช้ rule ที่ require auth)
+    auth.signInAnonymously()
+      .then(() => {
+        console.log('Signed in anonymously');
+        statusEl.textContent = 'เซ็นอินสำเร็จ กำลังอ่านสถานะ...';
+        listenStatus();
+      })
+      .catch(err => {
+        console.error('Sign-in error:', err);
+        statusEl.textContent = 'ไม่สามารถเซ็นอิน: ' + err.message;
+        updateUI(null);
+      });
+
+    // ฟังค่าจาก Realtime Database แบบเรียลไทม์
+    function listenStatus(){
+      const ref = db.ref(dbPath);
+      ref.on('value', snapshot => {
+        const value = snapshot.val();
+        // คาดว่าเป็น boolean true/false; ถ้า null ให้ถือว่า default false
+        if (value === null) {
+          updateUI(false);
+          // เขียนค่าเริ่มต้นเป็น false (optional)
+          ref.set(false).catch(e => console.error('set default error', e));
+        } else {
+          // ถ้า value เป็น object/อื่นๆ ให้แปลงเป็น boolean
+          const isOn = !!value;
+          updateUI(isOn);
+        }
+      }, error => {
+        console.error('listen error', error);
+        statusEl.textContent = 'ฟังสถานะผิดพลาด: ' + error.message;
+        updateUI(null);
+      });
+    }
+
+    // เมื่อกดปุ่ม ให้ toggle ค่า
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'กำลังทำ...';
+      try {
+        const ref = db.ref(dbPath);
+        // อ่านค่าปัจจุบันครั้งเดียว
+        const snap = await ref.get();
+        const current = snap.exists() ? !!snap.val() : false;
+        const newVal = !current;
+        await ref.set(newVal);
+        // UI จะอัพเดตจาก listener อัตโนมัติ
+      } catch (err) {
+        console.error('toggle error', err);
+        alert('เกิดข้อผิดพลาด: ' + err.message);
+      } finally {
+        // ปล่อยปุ่มไว้ — listener จะอัพเดตสถานะจริง
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
